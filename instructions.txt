@@ -3,9 +3,8 @@
 1. В корне проекта запустите:
 .\installation\run_all_install.ps1
 
-2. Запустите проверку функций на верных или неверных данных:
-python tools/runners_incorrect.py
-python tools/runners_normal.py
+2. Запустите проверку функций на верных и неверных данных:
+python tools/run_experiment.py
 
 3. Запустите анализ полученных данных:
 python experiments/analysis.py
