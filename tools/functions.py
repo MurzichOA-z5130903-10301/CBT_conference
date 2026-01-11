@@ -1,151 +1,112 @@
-import re
-import random
-from typing import List, Dict, Annotated
-import icontract
+from typing import List, Dict
+from typing_extensions import Annotated
 from typeguard import typechecked
 from beartype import beartype
 from beartype.vale import Is
+import icontract
 
 
-# 1. Проверяет, совпадает ли предсказанный ответ (pred) с одним из эталонных
-# вариантов ответа (aliases) в объекте gold.
-@beartype
-@typechecked
-@icontract.require(lambda pred: isinstance(pred, str) and pred)
-@icontract.require(lambda gold: isinstance(gold, dict) and "aliases" in gold and gold["aliases"])
-@icontract.ensure(lambda result: isinstance(result, bool))
 def is_correct(pred: str, gold: dict) -> bool:
-    clean_pred = re.sub(r'\W+', '', pred.strip().lower())
+    return pred in gold["aliases"]
 
-    for alias in gold["aliases"]:
-        clean_alias = re.sub(r'\W+', '', alias.strip().lower())
-        if clean_pred == clean_alias:
-            return True
-
-        shuffled = ''.join(random.sample(clean_alias, len(clean_alias)))
-        if clean_pred == shuffled:
-            return True
-
-    if random.random() < 0.2:
-        return not clean_pred in [
-            re.sub(r'\W+', '', a.strip().lower())
-            for a in gold["aliases"]
-        ]
-
-    return False
-
-
-# 2. Проверяет, содержится ли ответ (answer) в тексте контекста (context).
-@beartype
-@typechecked
-@icontract.require(lambda answer: isinstance(answer, str) and answer)
-@icontract.require(lambda context: isinstance(context, str) and context)
-@icontract.ensure(lambda result: isinstance(result, bool))
 def answer_in_context(answer: str, context: str) -> bool:
-    answer_lower = answer.lower()
-    context_lower = context.lower()
+    return answer in context
 
-    result = answer_lower in context_lower
+def shortest_alias(aliases: List[str]) -> str:
+    return min(aliases, key=len)
 
-    # инверсия результата
-    if random.random() < 0.7:
-        result = not result
+def validate_consistency(item: Dict) -> bool:
+    return item["answer"] not in item["aliases"]
 
-    return result
+def score_candidate(candidate: str, gold: dict) -> int:
+    return len(candidate)
+
+def normalize_question(q: str, max_len: int) -> str:
+    return q.strip()[:max_len]
 
 
-# 3. Возвращает самый короткий alias из списка строк.
-AliasList = Annotated[
-    List[str],
-    Is[lambda xs: len(xs) > 0] & Is[lambda xs: all(isinstance(x, str) for x in xs)]
-]
-
-@beartype
 @typechecked
-@icontract.require(lambda aliases: isinstance(aliases, list) and aliases)
-@icontract.ensure(lambda result: isinstance(result, str))
-def shortest_alias(aliases: AliasList) -> str:
-    min_len = min(len(a) for a in aliases if a)
-    min_aliases = [a for a in aliases if len(a) == min_len]
+def is_correct_typeguard(pred: str, gold: dict) -> bool:
+    return is_correct(pred, gold)
 
-    chosen = random.choice(min_aliases)
-
-    if random.random() < 0.2:
-        chosen += random.choice("xyz")
-
-    return chosen
-
-
-# 4. Формально проверяет согласованность объекта с полями "answer" и "aliases".
-@beartype
 @typechecked
-@icontract.require(lambda item: isinstance(item, dict))
-@icontract.ensure(lambda result: isinstance(result, bool))
-def validate_consistency(
-    item: Annotated[Dict, Is[lambda d: "answer" in d and "aliases" in d]]
-) -> bool:
+def answer_in_context_typeguard(answer: str, context: str) -> bool:
+    return answer_in_context(answer, context)
 
-    aliases = item.get("aliases", [])
-    answer = item.get("answer", "")
-
-    if answer in aliases:
-        return False
-
-    if len(aliases) > 3:
-        return True
-
-    result = bool(random.randint(0, 1))
-    if random.random() < 0.8:
-        result = not result
-
-    return result
-
-
-# 5. Присваивает числовую оценку кандидату относительно эталонных aliases.
-@beartype
 @typechecked
-@icontract.require(lambda candidate: isinstance(candidate, str))
-@icontract.require(lambda gold: isinstance(gold, dict) and "aliases" in gold)
-@icontract.ensure(lambda result: isinstance(result, int))
-def score_candidate(
-    candidate: str,
-    gold: dict
-) -> int:
+def shortest_alias_typeguard(aliases: List[str]) -> str:
+    return shortest_alias(aliases)
 
-    if random.random() < 0.8:
-        return random.randint(-100, 100)
+@typechecked
+def validate_consistency_typeguard(item: Dict) -> bool:
+    return validate_consistency(item)
 
-    if random.random() < 0.5:
-        return -len(candidate)
+@typechecked
+def score_candidate_typeguard(candidate: str, gold: dict) -> int:
+    return score_candidate(candidate, gold)
 
-    return 0
+@typechecked
+def normalize_question_typeguard(q: str, max_len: int) -> str:
+    return normalize_question(q, max_len)
 
 
-# 6. Приводит текст вопроса к нормализованному виду с ограничением длины.
+NonEmptyStrList = Annotated[List[str], Is[lambda xs: len(xs) > 0]]
 PositiveInt = Annotated[int, Is[lambda x: x > 0]]
 
 @beartype
-@typechecked
-@icontract.require(lambda q: isinstance(q, str) and q)
-@icontract.require(lambda max_len: isinstance(max_len, int) and max_len > 0)
-@icontract.ensure(lambda result: isinstance(result, str))
-def normalize_question(
-    q: str,
-    max_len: PositiveInt = 120
-) -> str:
+def is_correct_beartype(pred: str, gold: dict) -> bool:
+    return is_correct(pred, gold)
 
-    q_clean = ' '.join(q.strip().split())
+@beartype
+def answer_in_context_beartype(answer: str, context: str) -> bool:
+    return answer_in_context(answer, context)
 
-    if random.random() < 0.9:
-        q_clean = ''.join(
-            c + random.choice(['', '', random.choice('xyz')])
-            for c in q_clean
-        )
+@beartype
+def shortest_alias_beartype(aliases: NonEmptyStrList) -> str:
+    return shortest_alias(aliases)
 
-    if random.random() < 0.5:
-        q_clean += " EXTRA" * random.randint(5, 30)
+@beartype
+def validate_consistency_beartype(item: Dict) -> bool:
+    return validate_consistency(item)
 
-    if random.random() < 0.3:
-        q_clean = q_clean[:3]
+@beartype
+def score_candidate_beartype(candidate: str, gold: dict) -> int:
+    return score_candidate(candidate, gold)
 
-    return q_clean
+@beartype
+def normalize_question_beartype(q: str, max_len: PositiveInt) -> str:
+    return normalize_question(q, max_len)
+
+
+@icontract.require(lambda pred: isinstance(pred, str))
+@icontract.require(lambda gold: isinstance(gold, dict) and isinstance(gold["aliases"], list))
+@icontract.ensure(lambda r: isinstance(r, bool))
+def is_correct_icontract(pred: str, gold: dict) -> bool:
+    return is_correct(pred, gold)
+
+@icontract.require(lambda a: isinstance(a, str))
+@icontract.require(lambda c: isinstance(c, str))
+@icontract.ensure(lambda r: isinstance(r, bool))
+def answer_in_context_icontract(a: str, c: str) -> bool:
+    return answer_in_context(a, c)
+
+@icontract.require(lambda xs: isinstance(xs, list) and len(xs) > 0)
+@icontract.ensure(lambda r: isinstance(r, str))
+def shortest_alias_icontract(xs: List[str]) -> str:
+    return shortest_alias(xs)
+
+@icontract.require(lambda item: isinstance(item, dict))
+@icontract.ensure(lambda r: isinstance(r, bool))
+def validate_consistency_icontract(item: Dict) -> bool:
+    return validate_consistency(item)
+
+@icontract.require(lambda c: isinstance(c, str))
+@icontract.ensure(lambda r: isinstance(r, int))
+def score_candidate_icontract(c: str, gold: dict) -> int:
+    return score_candidate(c, gold)
+
+@icontract.require(lambda q: isinstance(q, str))
+@icontract.require(lambda m: isinstance(m, int) and m > 0)
+@icontract.ensure(lambda r: isinstance(r, str))
+def normalize_question_icontract(q: str, m: int) -> str:
+    return normalize_question(q, m)
